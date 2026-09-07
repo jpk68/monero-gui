@@ -82,6 +82,39 @@ GridLayout {
         return addr + ":" + port;
     }
 
+    function parseAddress(input) {
+        input = input.trim();
+
+        // strip URI scheme, e.g. "https://"
+        input = input.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, "");
+
+        // strip any path, query or fragment
+        var pathIndex = input.search(/[\/\?#]/);
+        if (pathIndex !== -1) {
+            input = input.substring(0, pathIndex);
+        }
+
+        var port = "";
+
+        if (input.indexOf("[") === 0) {
+            // bracketed IPv6, e.g. "[::1]:18081" or "[::1]"
+            var bracketMatch = input.match(/^(\[[0-9a-fA-F:]+\])(?::(\d+))?$/);
+            if (bracketMatch) {
+                input = bracketMatch[1];
+                port = bracketMatch[2] || "";
+            }
+        } else if (!ipv6Regex.test(input)) {
+            // hostname or IPv4, optionally followed by a port
+            var hostPortMatch = input.match(/^([^:]+):(\d+)$/);
+            if (hostPortMatch) {
+                input = hostPortMatch[1];
+                port = hostPortMatch[2];
+            }
+        }
+
+        return { host: input, port: port };
+    }
+
     MoneroComponents.LineEdit {
         id: daemonAddr
         Layout.fillWidth: true
@@ -97,11 +130,18 @@ GridLayout {
         fontColor: lineEditFontColor
         fontBold: lineEditFontBold
         fontSize: lineEditFontSize
-        onEditingFinished: {
-            text = text.replace(ipv6Regex, "[$1]");
-            root.editingFinished();
+        onEditingFinished: root.editingFinished()
+        onTextChanged: {
+            var parsed = root.parseAddress(text);
+            var newHost = parsed.host.replace(ipv6Regex, "[$1]");
+            if (parsed.port !== "") {
+                daemonPort.text = parsed.port;
+            }
+            if (newHost !== text) {
+                text = newHost;
+            }
+            root.textChanged();
         }
-        onTextChanged: root.textChanged()
         text: initialHostPort[1]
     }
 
